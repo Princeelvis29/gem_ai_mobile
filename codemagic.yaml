@@ -1,0 +1,25 @@
+workflows:
+  gem-ai-mobile-workflow:
+    name: Gem AI Mobile Build
+    instance_type: mac_mini_m1
+    max_build_duration: 120
+    environment:
+      flutter: stable
+    scripts:
+      - name: Get Flutter Packages
+        script: flutter pub get
+      - name: Build Android App Bundle (AAB)
+        script: flutter build appbundle --release
+      - name: Build iOS App
+        script: flutter build ios --release --no-codesign
+    artifacts:
+      - build/app/outputs/bundle/release/**/*.aab
+      - build/ios/ipa/*.ipa
+      - build/ios/xcarchive/*.xcarchive
+    publishing:
+      email:
+        recipients:
+          - your-email@example.com
+        notify:
+          success: true
+          failure: true
