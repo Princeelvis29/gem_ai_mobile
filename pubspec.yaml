@@ -13,6 +13,7 @@ dependencies:
   flutter_inappwebview: ^6.1.5
   permission_handler: ^12.0.3
   url_launcher: ^6.3.2
+  connectivity_plus: ^6.0.5
 
 dev_dependencies:
   flutter_test:
@@ -26,7 +27,6 @@ flutter_launcher_icons:
   ios: true
   image_path: "assets/logo.png"
 
-# NEW: Splash Screen Configuration
 flutter_native_splash:
   color: "#ffffff"
   image: assets/logo.png
