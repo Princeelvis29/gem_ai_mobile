@@ -1,4 +1,6 @@
 import 'dart:async';
+import 'dart:collection';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:permission_handler/permission_handler.dart';
@@ -10,29 +12,23 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 @pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   await Firebase.initializeApp();
-  print("Handling a background message: ${message.messageId}");
+  debugPrint("Handling a background message: ${message.messageId}");
 }
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  
   await Firebase.initializeApp();
-  
   FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
   
   FirebaseMessaging messaging = FirebaseMessaging.instance;
-  await messaging.requestPermission(
-    alert: true,
-    badge: true,
-    sound: true,
-  );
-  
+  await messaging.requestPermission(alert: true, badge: true, sound: true);
   await Permission.storage.request();
+  
   runApp(const GemAiApp());
 }
 
 class GemAiApp extends StatelessWidget {
-  const GemAiApp({Key? key}) : super(key: key);
+  const GemAiApp({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -40,7 +36,7 @@ class GemAiApp extends StatelessWidget {
       title: 'Gem AI',
       theme: ThemeData(
         primaryColor: const Color(0xFF007BFF),
-        primarySwatch: Colors.blue,
+        scaffoldBackgroundColor: Colors.white,
       ),
       home: const WebViewScreen(),
       debugShowCheckedModeBanner: false,
@@ -49,7 +45,7 @@ class GemAiApp extends StatelessWidget {
 }
 
 class WebViewScreen extends StatefulWidget {
-  const WebViewScreen({Key? key}) : super(key: key);
+  const WebViewScreen({super.key});
 
   @override
   State<WebViewScreen> createState() => _WebViewScreenState();
@@ -63,17 +59,17 @@ class _WebViewScreenState extends State<WebViewScreen> {
 
   bool isLoading = true;
   bool isOffline = false;
-  bool isLoggedIn = false; // Tracks dynamic auth state
+  bool isLoggedIn = false; 
+  bool isDarkMode = false;
   int _selectedIndex = 0;
 
-  // Dynamic URLs based on Auth State
   List<String> get _currentNavUrls {
     if (isLoggedIn) {
       return [
         "https://gem-ai.top",
         "", 
         "https://gem-ai.top/dashboard",
-        "https://gem-ai.top/user/profile", // Fallback URL
+        "https://gem-ai.top/user/profile", 
       ];
     }
     return [
@@ -84,68 +80,78 @@ class _WebViewScreenState extends State<WebViewScreen> {
     ];
   }
 
-  // Dynamic Bottom Nav Items based on Auth State
   List<BottomNavigationBarItem> get _navItems {
     if (isLoggedIn) {
       return const [
-        BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Home'),
-        BottomNavigationBarItem(icon: Icon(Icons.menu), label: 'Menu'),
-        BottomNavigationBarItem(icon: Icon(Icons.dashboard), label: 'Dashboard'),
-        BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Profile'),
+        BottomNavigationBarItem(icon: Icon(Icons.home_rounded), label: 'Home'),
+        BottomNavigationBarItem(icon: Icon(Icons.grid_view_rounded), label: 'Menu'),
+        BottomNavigationBarItem(icon: Icon(Icons.dashboard_rounded), label: 'Dashboard'),
+        BottomNavigationBarItem(icon: Icon(Icons.person_rounded), label: 'Profile'),
       ];
     }
     return const [
-      BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Home'),
-      BottomNavigationBarItem(icon: Icon(Icons.menu), label: 'Menu'),
-      BottomNavigationBarItem(icon: Icon(Icons.person_add), label: 'Register'),
-      BottomNavigationBarItem(icon: Icon(Icons.login), label: 'Login'),
+      BottomNavigationBarItem(icon: Icon(Icons.home_rounded), label: 'Home'),
+      BottomNavigationBarItem(icon: Icon(Icons.grid_view_rounded), label: 'Menu'),
+      BottomNavigationBarItem(icon: Icon(Icons.person_add_rounded), label: 'Register'),
+      BottomNavigationBarItem(icon: Icon(Icons.login_rounded), label: 'Login'),
     ];
   }
 
-  InAppWebViewSettings settings = InAppWebViewSettings(
-    isInspectable: true,
-    mediaPlaybackRequiresUserGesture: false,
-    allowsInlineMediaPlayback: true,
-    iframeAllow: "camera; microphone",
-    iframeAllowFullscreen: true,
-    domStorageEnabled: true,
-    databaseEnabled: true,
-    useShouldInterceptRequest: true,
-  );
-
-  final String hideHeaderScript = """
+  final String _nativeStyles = """
     var style = document.createElement('style');
-    style.innerHTML = 'header, nav, .navbar, .mobile-header, #header { display: none !important; }';
-    document.head.appendChild(style);
+    style.innerHTML = `
+      header, nav, footer, .navbar, .mobile-header, #header, #footer { display: none !important; }
+      body { 
+        overscroll-behavior-y: none;
+        -webkit-touch-callout: none !important; 
+        -webkit-user-select: none !important; 
+        user-select: none !important; 
+        -webkit-tap-highlight-color: transparent !important;
+      }
+      input, textarea { 
+        -webkit-user-select: auto !important; 
+        user-select: auto !important; 
+      }
+    `;
+    if(document.head) {
+       document.head.appendChild(style);
+    } else {
+       document.documentElement.appendChild(style);
+    }
   """;
+
+  late InAppWebViewSettings settings;
 
   @override
   void initState() {
     super.initState();
     
+    settings = InAppWebViewSettings(
+      isInspectable: true,
+      mediaPlaybackRequiresUserGesture: false,
+      allowsInlineMediaPlayback: true,
+      iframeAllow: "camera; microphone",
+      iframeAllowFullscreen: true,
+      domStorageEnabled: true,
+      databaseEnabled: true,
+      useShouldInterceptRequest: true,
+      transparentBackground: true, 
+    );
+
     _checkConnectivity();
-    
     subscription = Connectivity().onConnectivityChanged.listen((List<ConnectivityResult> result) {
-      setState(() {
-        isOffline = result.contains(ConnectivityResult.none);
-      });
+      setState(() => isOffline = result.contains(ConnectivityResult.none));
     });
 
     pullToRefreshController = PullToRefreshController(
-      settings: PullToRefreshSettings(
-        color: const Color(0xFF007BFF),
-      ),
-      onRefresh: () async {
-        webViewController?.reload();
-      },
+      settings: PullToRefreshSettings(color: const Color(0xFF007BFF)),
+      onRefresh: () async => webViewController?.reload(),
     );
   }
 
   Future<void> _checkConnectivity() async {
     final result = await Connectivity().checkConnectivity();
-    setState(() {
-      isOffline = result.contains(ConnectivityResult.none);
-    });
+    setState(() => isOffline = result.contains(ConnectivityResult.none));
   }
 
   @override
@@ -154,108 +160,102 @@ class _WebViewScreenState extends State<WebViewScreen> {
     super.dispose();
   }
 
-  // Show Native Bottom Sheet Menu
+  void _toggleDarkMode() async {
+    await webViewController?.evaluateJavascript(source: """
+      document.documentElement.classList.toggle('dark');
+      localStorage.setItem('color-theme', document.documentElement.classList.contains('dark') ? 'dark' : 'light');
+    """);
+    bool isDarkNow = await webViewController?.evaluateJavascript(source: "document.documentElement.classList.contains('dark')") ?? !isDarkMode;
+    setState(() => isDarkMode = isDarkNow);
+  }
+
+  void _performLogout() async {
+    await webViewController?.evaluateJavascript(source: """
+      var logoutForm = document.querySelector('form[action*="logout"]');
+      if(logoutForm) { logoutForm.submit(); }
+    """);
+    setState(() {
+      isLoggedIn = false;
+      _selectedIndex = 0;
+    });
+  }
+
+  void _navigateToProfile() {
+    setState(() => _selectedIndex = 3);
+    webViewController?.loadUrl(urlRequest: URLRequest(url: WebUri("https://gem-ai.top/user/profile")));
+  }
+
   void _showNativeMenu(BuildContext context) {
+    final surfaceColor = isDarkMode ? const Color(0xFF1F2937) : Colors.white;
+    final textColor = isDarkMode ? Colors.white : Colors.black87;
+    
     showModalBottomSheet(
       context: context,
+      backgroundColor: surfaceColor,
       isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (context) {
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+      builder: (BuildContext sheetContext) {
         return SafeArea(
           child: SingleChildScrollView(
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                // Native Profile Header (Only shows if logged in)
+                const SizedBox(height: 12),
+                Container(width: 40, height: 4, decoration: BoxDecoration(color: Colors.grey[400], borderRadius: BorderRadius.circular(10))),
+                const SizedBox(height: 20),
+                
                 if (isLoggedIn) ...[
-                  const SizedBox(height: 10),
                   ListTile(
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 24),
                     leading: const CircleAvatar(
                       backgroundColor: Color(0xFF007BFF),
-                      child: Icon(Icons.person, color: Colors.white),
+                      child: Icon(Icons.person_rounded, color: Colors.white),
                     ),
-                    title: const Text('My Account', style: TextStyle(fontWeight: FontWeight.bold)),
-                    subtitle: const Text('Manage your profile and settings'),
+                    title: Text('My Account', style: TextStyle(fontWeight: FontWeight.bold, color: textColor)),
+                    subtitle: Text('Manage your profile and settings', style: TextStyle(color: isDarkMode ? Colors.grey[400] : Colors.grey[600])),
                     onTap: () {
-                      Navigator.pop(context);
+                      Navigator.pop(sheetContext);
                       _navigateToProfile();
                     },
                   ),
-                  const Divider(),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 24),
+                    child: Divider(color: isDarkMode ? Colors.grey[700] : Colors.grey[200]),
+                  ),
                 ],
-                ListTile(
-                  leading: const Icon(Icons.monetization_on, color: Color(0xFF007BFF)),
-                  title: const Text('Pricing'),
-                  onTap: () {
-                    Navigator.pop(context);
-                    webViewController?.loadUrl(urlRequest: URLRequest(url: WebUri("https://gem-ai.top/pricing")));
-                  },
+                
+                _buildMenuItem(sheetContext, Icons.monetization_on_rounded, 'Pricing', "https://gem-ai.top/pricing", textColor),
+                _buildMenuItem(sheetContext, Icons.help_outline_rounded, 'FAQs', "https://gem-ai.top/faqs", textColor),
+                _buildMenuItem(sheetContext, Icons.article_outlined, 'Blog', "https://gem-ai.top/blog", textColor),
+                _buildMenuItem(sheetContext, Icons.contact_mail_outlined, 'Contact Us', "https://gem-ai.top/contact", textColor),
+                
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 24),
+                  child: Divider(color: isDarkMode ? Colors.grey[700] : Colors.grey[200]),
                 ),
+                
                 ListTile(
-                  leading: const Icon(Icons.help, color: Color(0xFF007BFF)),
-                  title: const Text('FAQs'),
-                  onTap: () {
-                    Navigator.pop(context);
-                    webViewController?.loadUrl(urlRequest: URLRequest(url: WebUri("https://gem-ai.top/faqs")));
-                  },
-                ),
-                ListTile(
-                  leading: const Icon(Icons.article, color: Color(0xFF007BFF)),
-                  title: const Text('Blog'),
-                  onTap: () {
-                    Navigator.pop(context);
-                    webViewController?.loadUrl(urlRequest: URLRequest(url: WebUri("https://gem-ai.top/blog")));
-                  },
-                ),
-                ListTile(
-                  leading: const Icon(Icons.contact_mail, color: Color(0xFF007BFF)),
-                  title: const Text('Contact'),
-                  onTap: () {
-                    Navigator.pop(context);
-                    webViewController?.loadUrl(urlRequest: URLRequest(url: WebUri("https://gem-ai.top/contact")));
-                  },
-                ),
-                const Divider(),
-                ListTile(
-                  leading: const Icon(Icons.dark_mode, color: Colors.black87),
-                  title: const Text('Toggle Dark/Light Mode'),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 24),
+                  leading: Icon(isDarkMode ? Icons.light_mode_rounded : Icons.dark_mode_rounded, color: isDarkMode ? Colors.yellow[400] : Colors.grey[800]),
+                  title: Text(isDarkMode ? 'Switch to Light Mode' : 'Switch to Dark Mode', style: TextStyle(color: textColor, fontWeight: FontWeight.w600)),
                   onTap: () async {
-                    Navigator.pop(context);
-                    await webViewController?.evaluateJavascript(source: """
-                      var themeIcon = document.querySelector('.fa-sun, .fa-moon');
-                      if (themeIcon) {
-                        var btn = themeIcon.closest('button') || themeIcon.parentElement;
-                        if (btn) {
-                          btn.click();
-                        } else {
-                          themeIcon.click();
-                        }
-                      } else {
-                        document.body.classList.toggle('dark-mode');
-                        document.body.classList.toggle('dark');
-                      }
-                    """);
+                    Navigator.pop(sheetContext);
+                    _toggleDarkMode();
                   },
                 ),
-                // Native Log Out Button (Only shows if logged in)
+                
                 if (isLoggedIn) ...[
-                  const Divider(),
                   ListTile(
-                    leading: const Icon(Icons.logout, color: Colors.red),
-                    title: const Text('Log Out', style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold)),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 24),
+                    leading: const Icon(Icons.logout_rounded, color: Colors.redAccent),
+                    title: const Text('Log Out', style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold)),
                     onTap: () async {
-                      Navigator.pop(context);
-                      // Finds and securely submits the hidden Laravel logout form
-                      await webViewController?.evaluateJavascript(source: """
-                        var logoutForm = document.querySelector('form[action*="logout"]');
-                        if(logoutForm) { logoutForm.submit(); }
-                      """);
+                      Navigator.pop(sheetContext);
+                      _performLogout();
                     },
                   ),
                 ],
-                const SizedBox(height: 10),
+                const SizedBox(height: 24),
               ],
             ),
           ),
@@ -264,14 +264,16 @@ class _WebViewScreenState extends State<WebViewScreen> {
     );
   }
 
-  void _navigateToProfile() {
-    setState(() { _selectedIndex = 3; });
-    // Safely attempt to click the web link first, fallback to standard URL if not found
-    webViewController?.evaluateJavascript(source: """
-      var profileLink = Array.from(document.querySelectorAll('a')).find(a => a.innerText.includes('Profile and Settings'));
-      if (profileLink) profileLink.click();
-      else window.location.href = '/user/profile';
-    """);
+  ListTile _buildMenuItem(BuildContext sheetContext, IconData icon, String title, String url, Color textColor) {
+    return ListTile(
+      contentPadding: const EdgeInsets.symmetric(horizontal: 24),
+      leading: Icon(icon, color: const Color(0xFF007BFF)),
+      title: Text(title, style: TextStyle(color: textColor, fontWeight: FontWeight.w600)),
+      onTap: () {
+        Navigator.pop(sheetContext);
+        webViewController?.loadUrl(urlRequest: URLRequest(url: WebUri(url)));
+      },
+    );
   }
 
   void _onItemTapped(int index) {
@@ -279,85 +281,158 @@ class _WebViewScreenState extends State<WebViewScreen> {
       _showNativeMenu(context);
       return;
     }
-    
-    setState(() {
-      _selectedIndex = index;
-    });
-
+    setState(() => _selectedIndex = index);
     if (isLoggedIn && index == 3) {
       _navigateToProfile();
     } else {
-      webViewController?.loadUrl(
-          urlRequest: URLRequest(url: WebUri(_currentNavUrls[index])));
+      webViewController?.loadUrl(urlRequest: URLRequest(url: WebUri(_currentNavUrls[index])));
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final bgColor = isDarkMode ? const Color(0xFF111827) : Colors.white; 
+    final surfaceColor = isDarkMode ? const Color(0xFF1F2937) : Colors.white; 
+    final textColor = isDarkMode ? Colors.white : Colors.black87;
+
     return PopScope(
       canPop: false,
-      onPopInvoked: (didPop) async {
+      onPopInvokedWithResult: (didPop, result) async {
         if (didPop) return;
-        if (webViewController != null) {
-          bool canGoBack = await webViewController!.canGoBack();
-          if (canGoBack) {
-            webViewController!.goBack(); 
-          }
+        if (webViewController != null && await webViewController!.canGoBack()) {
+          webViewController!.goBack(); 
         }
       },
       child: Scaffold(
-        backgroundColor: Colors.white,
-        body: SafeArea(
-          child: isOffline ? _buildOfflineScreen() : Stack(
+        backgroundColor: bgColor,
+        appBar: AppBar(
+          backgroundColor: surfaceColor,
+          elevation: 0,
+          surfaceTintColor: Colors.transparent,
+          title: Row(
             children: [
-              InAppWebView(
-                key: webViewKey,
-                initialUrlRequest: URLRequest(url: WebUri(_currentNavUrls[0])),
-                initialSettings: settings,
-                pullToRefreshController: pullToRefreshController,
-                onWebViewCreated: (controller) {
-                  webViewController = controller;
-                },
-                onLoadStart: (controller, url) {
-                  setState(() { isLoading = true; });
-                },
-                onLoadStop: (controller, url) async {
-                  pullToRefreshController?.endRefreshing();
-                  
-                  // Intelligently check auth state by looking for the logout form
-                  bool authCheck = await controller.evaluateJavascript(source: "document.querySelector('form[action*=\"logout\"]') !== null") ?? false;
-                  
-                  setState(() { 
-                    isLoading = false; 
-                    isLoggedIn = authCheck;
-                  });
-
-                  await controller.evaluateJavascript(source: hideHeaderScript);
-                },
-                onDownloadStartRequest: (controller, downloadRequest) async {
-                  final uri = downloadRequest.url;
-                  if (await canLaunchUrl(uri)) {
-                    await launchUrl(uri, mode: LaunchMode.externalApplication);
-                  }
-                },
+              Container(
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(
+                  color: const Color(0x1A007BFF), // Replaced withOpacity
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(Icons.all_inclusive_rounded, color: Color(0xFF007BFF), size: 24), // Fixed Icon Name
               ),
-              isLoading
-                  ? const Center(
-                      child: CircularProgressIndicator(
-                        valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF007BFF)),
-                      ),
-                    )
-                  : const SizedBox.shrink(),
+              const SizedBox(width: 10),
+              Text('Gem AI', style: TextStyle(color: textColor, fontWeight: FontWeight.w800, fontSize: 20, letterSpacing: -0.5)),
             ],
           ),
+          actions: [
+            IconButton(
+              icon: Icon(isDarkMode ? Icons.light_mode_rounded : Icons.dark_mode_rounded, 
+                         color: isDarkMode ? Colors.yellow[400] : Colors.grey[700]),
+              onPressed: _toggleDarkMode,
+            ),
+            if (isLoggedIn) ...[
+              const SizedBox(width: 4),
+              PopupMenuButton<String>(
+                color: surfaceColor,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                offset: const Offset(0, 45),
+                icon: const CircleAvatar(
+                  backgroundColor: Color(0xFF007BFF),
+                  radius: 15,
+                  child: Text('E', style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold)),
+                ),
+                onSelected: (value) {
+                  if (value == 'profile') _navigateToProfile();
+                  if (value == 'logout') _performLogout();
+                },
+                itemBuilder: (BuildContext context) => <PopupMenuEntry<String>>[
+                  PopupMenuItem<String>(
+                    value: 'profile',
+                    child: Row(children: [
+                      Icon(Icons.manage_accounts_rounded, color: isDarkMode ? Colors.grey[400] : Colors.grey[700]),
+                      const SizedBox(width: 12),
+                      Text('Profile and Settings', style: TextStyle(color: textColor, fontWeight: FontWeight.w500)),
+                    ]),
+                  ),
+                  const PopupMenuDivider(),
+                  const PopupMenuItem<String>(
+                    value: 'logout',
+                    child: Row(children: [
+                      Icon(Icons.logout_rounded, color: Colors.redAccent),
+                      SizedBox(width: 12),
+                      Text('Log Out', style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold)),
+                    ]),
+                  ),
+                ],
+              ),
+            ],
+            const SizedBox(width: 8),
+          ],
         ),
-        bottomNavigationBar: BottomNavigationBar(
-          type: BottomNavigationBarType.fixed,
-          items: _navItems,
-          currentIndex: _selectedIndex,
-          selectedItemColor: const Color(0xFF007BFF),
-          unselectedItemColor: Colors.grey,
-          onTap: _onItemTapped,
+        
+        body: isOffline ? _buildOfflineScreen() : Stack(
+          children: [
+            InAppWebView(
+              key: webViewKey,
+              initialUrlRequest: URLRequest(url: WebUri(_currentNavUrls[0])),
+              initialSettings: settings,
+              initialUserScripts: UnmodifiableListView<UserScript>([
+                UserScript(
+                  source: _nativeStyles,
+                  injectionTime: UserScriptInjectionTime.AT_DOCUMENT_START,
+                )
+              ]),
+              pullToRefreshController: pullToRefreshController,
+              onWebViewCreated: (controller) => webViewController = controller,
+              onLoadStart: (controller, url) => setState(() => isLoading = true),
+              onLoadStop: (controller, url) async {
+                pullToRefreshController?.endRefreshing();
+                bool authCheck = await controller.evaluateJavascript(source: "document.querySelector('form[action*=\"logout\"]') !== null") ?? false;
+                bool themeCheck = await controller.evaluateJavascript(source: "document.documentElement.classList.contains('dark')") ?? false;
+                
+                setState(() { 
+                  isLoading = false; 
+                  isLoggedIn = authCheck;
+                  isDarkMode = themeCheck;
+                });
+              },
+              onDownloadStartRequest: (controller, downloadRequest) async {
+                final uri = downloadRequest.url;
+                if (await canLaunchUrl(uri)) {
+                  await launchUrl(uri, mode: LaunchMode.externalApplication);
+                }
+              },
+            ),
+            if (isLoading)
+              Positioned(
+                top: 0,
+                left: 0,
+                right: 0,
+                child: LinearProgressIndicator(
+                  valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF007BFF)),
+                  backgroundColor: surfaceColor,
+                  minHeight: 3,
+                ),
+              ),
+          ],
+        ),
+        
+        bottomNavigationBar: Container(
+          decoration: BoxDecoration(
+            color: surfaceColor,
+            border: Border(top: BorderSide(color: isDarkMode ? Colors.grey[800]! : Colors.grey[200]!, width: 1)),
+          ),
+          child: BottomNavigationBar(
+            type: BottomNavigationBarType.fixed,
+            backgroundColor: Colors.transparent,
+            elevation: 0,
+            items: _navItems,
+            currentIndex: _selectedIndex,
+            selectedItemColor: const Color(0xFF007BFF),
+            unselectedItemColor: isDarkMode ? Colors.grey[500] : Colors.grey[400],
+            selectedLabelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+            unselectedLabelStyle: const TextStyle(fontWeight: FontWeight.w500, fontSize: 12),
+            onTap: _onItemTapped,
+          ),
         ),
       ),
     );
@@ -368,34 +443,25 @@ class _WebViewScreenState extends State<WebViewScreen> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          const Icon(Icons.wifi_off, size: 80, color: Colors.grey),
+          Icon(Icons.wifi_off_rounded, size: 80, color: isDarkMode ? Colors.grey[600] : Colors.grey[400]),
           const SizedBox(height: 20),
-          const Text(
-            "No Internet Connection",
-            style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
-          ),
+          Text("No Internet Connection", style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: isDarkMode ? Colors.white : Colors.black87)),
           const SizedBox(height: 10),
-          const Text(
-            "Please check your network settings.",
-            style: TextStyle(color: Colors.grey, fontSize: 16),
-          ),
+          Text("Please check your network settings.", style: TextStyle(color: isDarkMode ? Colors.grey[400] : Colors.grey[600], fontSize: 16)),
           const SizedBox(height: 30),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
               backgroundColor: const Color(0xFF007BFF),
               foregroundColor: Colors.white,
               padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 15),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(30.0),
-              ),
+              elevation: 0,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30.0)),
             ),
             onPressed: () async {
               await _checkConnectivity();
-              if (!isOffline) {
-                webViewController?.reload();
-              }
+              if (!isOffline) webViewController?.reload();
             },
-            child: const Text("Try Again", style: TextStyle(fontSize: 16)),
+            child: const Text("Try Again", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
           )
         ],
       ),
