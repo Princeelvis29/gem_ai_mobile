@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:collection';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart'; // Added for Haptics and System Exits
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -17,6 +18,10 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  
+  // Lock orientation to portrait for a more controlled app experience
+  await SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
+  
   await Firebase.initializeApp();
   FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
   
@@ -62,6 +67,7 @@ class _WebViewScreenState extends State<WebViewScreen> {
   bool isLoggedIn = false; 
   bool isDarkMode = false;
   int _selectedIndex = 0;
+  DateTime? currentBackPressTime; // For double-tap to exit
 
   List<String> get _currentNavUrls {
     if (isLoggedIn) {
@@ -69,7 +75,7 @@ class _WebViewScreenState extends State<WebViewScreen> {
         "https://gem-ai.top",
         "", 
         "https://gem-ai.top/dashboard",
-        "https://gem-ai.top/user/profile", 
+        "https://gem-ai.top/profile", 
       ];
     }
     return [
@@ -112,6 +118,8 @@ class _WebViewScreenState extends State<WebViewScreen> {
         -webkit-user-select: auto !important; 
         user-select: auto !important; 
       }
+      /* Hide web scrollbars for a cleaner native look */
+      ::-webkit-scrollbar { display: none; }
     `;
     if(document.head) {
        document.head.appendChild(style);
@@ -136,6 +144,11 @@ class _WebViewScreenState extends State<WebViewScreen> {
       databaseEnabled: true,
       useShouldInterceptRequest: true,
       transparentBackground: true, 
+      supportZoom: false, // Prevents pinch-to-zoom
+      builtInZoomControls: false,
+      displayZoomControls: false,
+      disableContextMenu: true, // Prevents long-press web menus
+      overScrollMode: OverScrollMode.NEVER, // Kills Android webview stretch effect
     );
 
     _checkConnectivity();
@@ -145,7 +158,10 @@ class _WebViewScreenState extends State<WebViewScreen> {
 
     pullToRefreshController = PullToRefreshController(
       settings: PullToRefreshSettings(color: const Color(0xFF007BFF)),
-      onRefresh: () async => webViewController?.reload(),
+      onRefresh: () async {
+        HapticFeedback.lightImpact(); // Haptic on refresh pull
+        webViewController?.reload();
+      },
     );
   }
 
@@ -161,6 +177,7 @@ class _WebViewScreenState extends State<WebViewScreen> {
   }
 
   void _toggleDarkMode() async {
+    HapticFeedback.mediumImpact(); // Native feel for theme switch
     await webViewController?.evaluateJavascript(source: """
       document.documentElement.classList.toggle('dark');
       localStorage.setItem('color-theme', document.documentElement.classList.contains('dark') ? 'dark' : 'light');
@@ -170,6 +187,7 @@ class _WebViewScreenState extends State<WebViewScreen> {
   }
 
   void _performLogout() async {
+    HapticFeedback.heavyImpact();
     await webViewController?.evaluateJavascript(source: """
       var logoutForm = document.querySelector('form[action*="logout"]');
       if(logoutForm) { logoutForm.submit(); }
@@ -182,10 +200,11 @@ class _WebViewScreenState extends State<WebViewScreen> {
 
   void _navigateToProfile() {
     setState(() => _selectedIndex = 3);
-    webViewController?.loadUrl(urlRequest: URLRequest(url: WebUri("https://gem-ai.top/user/profile")));
+    webViewController?.loadUrl(urlRequest: URLRequest(url: WebUri("https://gem-ai.top/profile")));
   }
 
   void _showNativeMenu(BuildContext context) {
+    HapticFeedback.selectionClick();
     final surfaceColor = isDarkMode ? const Color(0xFF1F2937) : Colors.white;
     final textColor = isDarkMode ? Colors.white : Colors.black87;
     
@@ -270,6 +289,7 @@ class _WebViewScreenState extends State<WebViewScreen> {
       leading: Icon(icon, color: const Color(0xFF007BFF)),
       title: Text(title, style: TextStyle(color: textColor, fontWeight: FontWeight.w600)),
       onTap: () {
+        HapticFeedback.lightImpact();
         Navigator.pop(sheetContext);
         webViewController?.loadUrl(urlRequest: URLRequest(url: WebUri(url)));
       },
@@ -277,6 +297,7 @@ class _WebViewScreenState extends State<WebViewScreen> {
   }
 
   void _onItemTapped(int index) {
+    HapticFeedback.lightImpact(); // Subtle vibration on tab switch
     if (index == 1) {
       _showNativeMenu(context);
       return;
@@ -299,8 +320,28 @@ class _WebViewScreenState extends State<WebViewScreen> {
       canPop: false,
       onPopInvokedWithResult: (didPop, result) async {
         if (didPop) return;
+        
+        // Native Back Button & Double Tap to Exit Handling
         if (webViewController != null && await webViewController!.canGoBack()) {
           webViewController!.goBack(); 
+        } else {
+          DateTime now = DateTime.now();
+          if (currentBackPressTime == null || now.difference(currentBackPressTime!) > const Duration(seconds: 2)) {
+            currentBackPressTime = now;
+            if (context.mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: const Text('Tap back again to exit', style: TextStyle(color: Colors.white)),
+                  backgroundColor: isDarkMode ? Colors.grey[800] : Colors.grey[900],
+                  duration: const Duration(seconds: 2),
+                  behavior: SnackBarBehavior.floating,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                ),
+              );
+            }
+          } else {
+            SystemNavigator.pop();
+          }
         }
       },
       child: Scaffold(
@@ -314,10 +355,10 @@ class _WebViewScreenState extends State<WebViewScreen> {
               Container(
                 padding: const EdgeInsets.all(6),
                 decoration: BoxDecoration(
-                  color: const Color(0x1A007BFF), // Replaced withOpacity
+                  color: const Color(0x1A007BFF), 
                   borderRadius: BorderRadius.circular(8),
                 ),
-                child: const Icon(Icons.all_inclusive_rounded, color: Color(0xFF007BFF), size: 24), // Fixed Icon Name
+                child: const Icon(Icons.all_inclusive_rounded, color: Color(0xFF007BFF), size: 24), 
               ),
               const SizedBox(width: 10),
               Text('Gem AI', style: TextStyle(color: textColor, fontWeight: FontWeight.w800, fontSize: 20, letterSpacing: -0.5)),
@@ -341,6 +382,7 @@ class _WebViewScreenState extends State<WebViewScreen> {
                   child: Text('E', style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold)),
                 ),
                 onSelected: (value) {
+                  HapticFeedback.selectionClick();
                   if (value == 'profile') _navigateToProfile();
                   if (value == 'logout') _performLogout();
                 },
@@ -401,6 +443,48 @@ class _WebViewScreenState extends State<WebViewScreen> {
                   await launchUrl(uri, mode: LaunchMode.externalApplication);
                 }
               },
+              // Intercept Web Javascript Alerts and show Native Flutter Dialogs
+              onJsAlert: (controller, jsAlertRequest) async {
+                HapticFeedback.mediumImpact();
+                await showDialog(
+                  context: context,
+                  builder: (context) => AlertDialog(
+                    backgroundColor: surfaceColor,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                    content: Text(jsAlertRequest.message ?? '', style: TextStyle(color: textColor)),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.of(context).pop(),
+                        child: const Text('OK', style: TextStyle(color: Color(0xFF007BFF), fontWeight: FontWeight.bold)),
+                      )
+                    ],
+                  ),
+                );
+                return JsAlertResponse(handledByClient: true);
+              },
+              onJsConfirm: (controller, jsConfirmRequest) async {
+                HapticFeedback.mediumImpact();
+                bool result = false;
+                await showDialog(
+                  context: context,
+                  builder: (context) => AlertDialog(
+                    backgroundColor: surfaceColor,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                    content: Text(jsConfirmRequest.message ?? '', style: TextStyle(color: textColor)),
+                    actions: [
+                      TextButton(
+                        onPressed: () { result = false; Navigator.of(context).pop(); },
+                        child: Text('Cancel', style: TextStyle(color: isDarkMode ? Colors.grey[400] : Colors.grey[600])),
+                      ),
+                      TextButton(
+                        onPressed: () { result = true; Navigator.of(context).pop(); },
+                        child: const Text('Confirm', style: TextStyle(color: Color(0xFF007BFF), fontWeight: FontWeight.bold)),
+                      )
+                    ],
+                  ),
+                );
+                return JsConfirmResponse(handledByClient: true, action: result ? JsConfirmResponseAction.CONFIRM : JsConfirmResponseAction.CANCEL);
+              },
             ),
             if (isLoading)
               Positioned(
@@ -458,6 +542,7 @@ class _WebViewScreenState extends State<WebViewScreen> {
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30.0)),
             ),
             onPressed: () async {
+              HapticFeedback.lightImpact();
               await _checkConnectivity();
               if (!isOffline) webViewController?.reload();
             },
