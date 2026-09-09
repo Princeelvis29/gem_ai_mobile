@@ -168,11 +168,20 @@ class _WebViewScreenState extends State<WebViewScreen> {
                 title: const Text('Toggle Dark/Light Mode'),
                 onTap: () async {
                   Navigator.pop(context);
-                  // JavaScript to trigger your website's dark mode
+                  // Updated JavaScript to target the parent button of the icon
                   await webViewController?.evaluateJavascript(source: """
-                    var moonBtn = document.querySelector('.fa-moon, .moon-icon, [class*="moon"]');
-                    if(moonBtn) { moonBtn.click(); } 
-                    else { document.body.classList.toggle('dark-mode'); document.body.classList.toggle('dark'); }
+                    var themeIcon = document.querySelector('.fa-sun, .fa-moon');
+                    if (themeIcon) {
+                      var btn = themeIcon.closest('button') || themeIcon.parentElement;
+                      if (btn) {
+                        btn.click();
+                      } else {
+                        themeIcon.click();
+                      }
+                    } else {
+                      document.body.classList.toggle('dark-mode');
+                      document.body.classList.toggle('dark');
+                    }
                   """);
                 },
               ),
