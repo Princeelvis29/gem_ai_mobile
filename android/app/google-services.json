@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "75616730026",
+    "project_id": "gem-ai-69fbe",
+    "storage_bucket": "gem-ai-69fbe.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:75616730026:android:82fbc2bacf37fdb11409d3",
+        "android_client_info": {
+          "package_name": "com.example.gem_ai_mobile"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDf2NtqGsKdgwXey_SHnLzhS-baRZIMrxI"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

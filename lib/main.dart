@@ -4,9 +4,23 @@ import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  
+  // Initialize Firebase First
+  await Firebase.initializeApp();
+  
+  // Request Push Notification Permission from the user
+  FirebaseMessaging messaging = FirebaseMessaging.instance;
+  await messaging.requestPermission(
+    alert: true,
+    badge: true,
+    sound: true,
+  );
+  
   await Permission.storage.request();
   runApp(const GemAiApp());
 }
@@ -72,10 +86,8 @@ class _WebViewScreenState extends State<WebViewScreen> {
   void initState() {
     super.initState();
     
-    // Check initial internet connection
     _checkConnectivity();
     
-    // Listen for internet connection changes in real-time
     subscription = Connectivity().onConnectivityChanged.listen((List<ConnectivityResult> result) {
       setState(() {
         isOffline = result.contains(ConnectivityResult.none);
@@ -115,7 +127,6 @@ class _WebViewScreenState extends State<WebViewScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // PopScope intercepts the Android hardware back button
     return PopScope(
       canPop: false,
       onPopInvoked: (didPop) async {
@@ -123,14 +134,13 @@ class _WebViewScreenState extends State<WebViewScreen> {
         if (webViewController != null) {
           bool canGoBack = await webViewController!.canGoBack();
           if (canGoBack) {
-            webViewController!.goBack(); // Go back one page in the browser
+            webViewController!.goBack(); 
           }
         }
       },
       child: Scaffold(
         backgroundColor: Colors.white,
         body: SafeArea(
-          // Switch between the Offline Screen and the actual Web App
           child: isOffline ? _buildOfflineScreen() : Stack(
             children: [
               InAppWebView(
@@ -190,7 +200,6 @@ class _WebViewScreenState extends State<WebViewScreen> {
     );
   }
 
-  // The custom layout for the No Internet screen
   Widget _buildOfflineScreen() {
     return Center(
       child: Column(
