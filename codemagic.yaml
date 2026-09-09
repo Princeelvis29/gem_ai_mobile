@@ -1,21 +1,60 @@
 workflows:
   gem-ai-mobile-workflow:
     name: Gem AI Mobile Build
-    instance_type: mac_mini_m1
+    instance_type: mac_mini_m2
     max_build_duration: 120
+
     environment:
       flutter: stable
+      java: 17
+
     scripts:
+      - name: Configure Flutter and Android SDK
+        script: |
+          echo "Flutter SDK: $FLUTTER_ROOT"
+          echo "Android SDK: $ANDROID_SDK_ROOT"
+
+          mkdir -p "$CM_BUILD_DIR/android"
+
+          cat > "$CM_BUILD_DIR/android/local.properties" <<EOF
+          flutter.sdk=$FLUTTER_ROOT
+          sdk.dir=$ANDROID_SDK_ROOT
+          EOF
+
+      - name: Install Android SDK 37
+        script: |
+          yes | sdkmanager --licenses >/dev/null || true
+
+          sdkmanager --sdk_root="$ANDROID_SDK_ROOT" \
+            "platforms;android-37"
+
+          echo "Installed Android SDK platforms:"
+          sdkmanager --sdk_root="$ANDROID_SDK_ROOT" --list_installed | grep "platforms;android-37" || true
+
       - name: Get Flutter Packages
-        script: flutter pub get
-      - name: Build Android App Bundle (AAB)
-        script: flutter build appbundle --release
+        script: |
+          flutter clean
+          flutter pub get
+
+      - name: Check Flutter and Android Environment
+        script: |
+          flutter doctor -v
+          java -version
+          ls -la "$ANDROID_SDK_ROOT/platforms/android-37"
+
+      - name: Build Android App Bundle
+        script: |
+          flutter build appbundle --release
+
       - name: Build iOS App
-        script: flutter build ios --release --no-codesign
+        script: |
+          flutter build ios --release --no-codesign
+
     artifacts:
       - build/app/outputs/bundle/release/**/*.aab
       - build/ios/ipa/*.ipa
       - build/ios/xcarchive/*.xcarchive
+
     publishing:
       email:
         recipients:
