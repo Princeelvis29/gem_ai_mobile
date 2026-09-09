@@ -18,6 +18,11 @@ workflows:
           flutter clean
           flutter pub get
 
+      - name: Generate SHA-256 Fingerprint
+        script: |
+          cd android
+          ./gradlew signingReport
+
       - name: Build Android App Bundle (AAB)
         script: |
           flutter build appbundle --release
