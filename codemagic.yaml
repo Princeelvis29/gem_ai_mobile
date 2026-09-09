@@ -18,9 +18,13 @@ workflows:
           flutter clean
           flutter pub get
 
-      - name: Build Android App Bundle
+      - name: Build Android App Bundle (AAB)
         script: |
           flutter build appbundle --release
+
+      - name: Build Android APK
+        script: |
+          flutter build apk --release
 
       - name: Build iOS App
         script: |
@@ -28,6 +32,7 @@ workflows:
 
     artifacts:
       - build/app/outputs/bundle/release/**/*.aab
+      - build/app/outputs/flutter-apk/**/*.apk
       - build/ios/ipa/*.ipa
       - build/ios/xcarchive/*.xcarchive
 
