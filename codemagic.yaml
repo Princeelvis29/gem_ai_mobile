@@ -9,38 +9,14 @@ workflows:
       java: 17
 
     scripts:
-      - name: Configure Flutter and Android SDK
+      - name: Set Android SDK location
         script: |
-          echo "Flutter SDK: $FLUTTER_ROOT"
-          echo "Android SDK: $ANDROID_SDK_ROOT"
-
-          mkdir -p "$CM_BUILD_DIR/android"
-
-          cat > "$CM_BUILD_DIR/android/local.properties" <<EOF
-          flutter.sdk=$FLUTTER_ROOT
-          sdk.dir=$ANDROID_SDK_ROOT
-          EOF
-
-      - name: Install Android SDK 37
-        script: |
-          yes | sdkmanager --licenses >/dev/null || true
-
-          sdkmanager --sdk_root="$ANDROID_SDK_ROOT" \
-            "platforms;android-37"
-
-          echo "Installed Android SDK platforms:"
-          sdkmanager --sdk_root="$ANDROID_SDK_ROOT" --list_installed | grep "platforms;android-37" || true
+          echo "sdk.dir=$ANDROID_SDK_ROOT" > "$CM_BUILD_DIR/android/local.properties"
 
       - name: Get Flutter Packages
         script: |
           flutter clean
           flutter pub get
-
-      - name: Check Flutter and Android Environment
-        script: |
-          flutter doctor -v
-          java -version
-          ls -la "$ANDROID_SDK_ROOT/platforms/android-37"
 
       - name: Build Android App Bundle
         script: |
