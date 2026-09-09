@@ -10,10 +10,8 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   
-  // Initialize Firebase First
   await Firebase.initializeApp();
   
-  // Request Push Notification Permission from the user
   FirebaseMessaging messaging = FirebaseMessaging.instance;
   await messaging.requestPermission(
     alert: true,
@@ -59,8 +57,10 @@ class _WebViewScreenState extends State<WebViewScreen> {
   bool isOffline = false;
   int _selectedIndex = 0;
 
+  // Added a blank placeholder at index 1 for the Menu button
   final List<String> _navUrls = [
     "https://gem-ai.top",
+    "", 
     "https://gem-ai.top/register", 
     "https://gem-ai.top/login",   
   ];
@@ -76,6 +76,7 @@ class _WebViewScreenState extends State<WebViewScreen> {
     useShouldInterceptRequest: true,
   );
 
+  // Re-added the script to hide the web header
   final String hideHeaderScript = """
     var style = document.createElement('style');
     style.innerHTML = 'header, nav, .navbar, .mobile-header, #header { display: none !important; }';
@@ -117,7 +118,78 @@ class _WebViewScreenState extends State<WebViewScreen> {
     super.dispose();
   }
 
+  // Show Native Bottom Sheet Menu
+  void _showNativeMenu(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) {
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ListTile(
+                leading: const Icon(Icons.monetization_on, color: Color(0xFF007BFF)),
+                title: const Text('Pricing'),
+                onTap: () {
+                  Navigator.pop(context);
+                  webViewController?.loadUrl(urlRequest: URLRequest(url: WebUri("https://gem-ai.top/pricing")));
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.help, color: Color(0xFF007BFF)),
+                title: const Text('FAQs'),
+                onTap: () {
+                  Navigator.pop(context);
+                  webViewController?.loadUrl(urlRequest: URLRequest(url: WebUri("https://gem-ai.top/faqs")));
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.article, color: Color(0xFF007BFF)),
+                title: const Text('Blog'),
+                onTap: () {
+                  Navigator.pop(context);
+                  webViewController?.loadUrl(urlRequest: URLRequest(url: WebUri("https://gem-ai.top/blog")));
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.contact_mail, color: Color(0xFF007BFF)),
+                title: const Text('Contact'),
+                onTap: () {
+                  Navigator.pop(context);
+                  webViewController?.loadUrl(urlRequest: URLRequest(url: WebUri("https://gem-ai.top/contact")));
+                },
+              ),
+              const Divider(),
+              ListTile(
+                leading: const Icon(Icons.dark_mode, color: Colors.black87),
+                title: const Text('Toggle Dark/Light Mode'),
+                onTap: () async {
+                  Navigator.pop(context);
+                  // JavaScript to trigger your website's dark mode
+                  await webViewController?.evaluateJavascript(source: """
+                    var moonBtn = document.querySelector('.fa-moon, .moon-icon, [class*="moon"]');
+                    if(moonBtn) { moonBtn.click(); } 
+                    else { document.body.classList.toggle('dark-mode'); document.body.classList.toggle('dark'); }
+                  """);
+                },
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
   void _onItemTapped(int index) {
+    // If the user taps the Menu icon (index 1), show the popup instead of loading a URL
+    if (index == 1) {
+      _showNativeMenu(context);
+      return;
+    }
+    
     setState(() {
       _selectedIndex = index;
     });
@@ -177,10 +249,15 @@ class _WebViewScreenState extends State<WebViewScreen> {
           ),
         ),
         bottomNavigationBar: BottomNavigationBar(
+          type: BottomNavigationBarType.fixed, // Forces all 4 icons to display properly
           items: const <BottomNavigationBarItem>[
             BottomNavigationBarItem(
               icon: Icon(Icons.home),
               label: 'Home',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.menu),
+              label: 'Menu',
             ),
             BottomNavigationBarItem(
               icon: Icon(Icons.person_add),
