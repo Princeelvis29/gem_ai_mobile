@@ -2,14 +2,14 @@ import 'dart:async';
 import 'dart:collection';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart'; // Added for Haptics and System Exits
+import 'package:flutter/services.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
-import 'package:firebase_in_app_messaging/firebase_in_app_messaging.dart'; // Added In-App Messaging
+import 'package:firebase_in_app_messaging/firebase_in_app_messaging.dart'; 
 
 @pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
@@ -19,13 +19,9 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  
-  // Lock orientation to portrait for a more controlled app experience
   await SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
-  
   await Firebase.initializeApp();
   FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
-  
   FirebaseMessaging messaging = FirebaseMessaging.instance;
   await messaging.requestPermission(alert: true, badge: true, sound: true);
   await Permission.storage.request();
@@ -68,7 +64,7 @@ class _WebViewScreenState extends State<WebViewScreen> {
   bool isLoggedIn = false; 
   bool isDarkMode = false;
   int _selectedIndex = 0;
-  DateTime? currentBackPressTime; // For double-tap to exit
+  DateTime? currentBackPressTime; 
 
   List<String> get _currentNavUrls {
     if (isLoggedIn) {
@@ -104,6 +100,7 @@ class _WebViewScreenState extends State<WebViewScreen> {
     ];
   }
 
+  // UPDATED: Script now strictly checks the domain before hiding elements!
   final String _nativeStyles = """
     var style = document.createElement('style');
     style.innerHTML = `
@@ -119,13 +116,15 @@ class _WebViewScreenState extends State<WebViewScreen> {
         -webkit-user-select: auto !important; 
         user-select: auto !important; 
       }
-      /* Hide web scrollbars for a cleaner native look */
       ::-webkit-scrollbar { display: none; }
     `;
-    if(document.head) {
-       document.head.appendChild(style);
-    } else {
-       document.documentElement.appendChild(style);
+    // Only apply aggressive hiding if we are on the Gem AI domain
+    if (window.location.hostname.includes('gem-ai.top')) {
+      if(document.head) {
+         document.head.appendChild(style);
+      } else {
+         document.documentElement.appendChild(style);
+      }
     }
   """;
 
@@ -144,12 +143,13 @@ class _WebViewScreenState extends State<WebViewScreen> {
       domStorageEnabled: true,
       databaseEnabled: true,
       useShouldInterceptRequest: true,
+      useShouldOverrideUrlLoading: true, // Activated URL interceptor
       transparentBackground: true, 
-      supportZoom: false, // Prevents pinch-to-zoom
+      supportZoom: false, 
       builtInZoomControls: false,
       displayZoomControls: false,
-      disableContextMenu: true, // Prevents long-press web menus
-      overScrollMode: OverScrollMode.NEVER, // Kills Android webview stretch effect
+      disableContextMenu: true, 
+      overScrollMode: OverScrollMode.NEVER, 
     );
 
     _checkConnectivity();
@@ -160,7 +160,7 @@ class _WebViewScreenState extends State<WebViewScreen> {
     pullToRefreshController = PullToRefreshController(
       settings: PullToRefreshSettings(color: const Color(0xFF007BFF)),
       onRefresh: () async {
-        HapticFeedback.lightImpact(); // Haptic on refresh pull
+        HapticFeedback.lightImpact(); 
         webViewController?.reload();
       },
     );
@@ -178,7 +178,7 @@ class _WebViewScreenState extends State<WebViewScreen> {
   }
 
   void _toggleDarkMode() async {
-    HapticFeedback.mediumImpact(); // Native feel for theme switch
+    HapticFeedback.mediumImpact(); 
     await webViewController?.evaluateJavascript(source: """
       document.documentElement.classList.toggle('dark');
       localStorage.setItem('color-theme', document.documentElement.classList.contains('dark') ? 'dark' : 'light');
@@ -202,6 +202,82 @@ class _WebViewScreenState extends State<WebViewScreen> {
   void _navigateToProfile() {
     setState(() => _selectedIndex = 3);
     webViewController?.loadUrl(urlRequest: URLRequest(url: WebUri("https://gem-ai.top/profile")));
+  }
+
+  // --- NATIVE PAYSTACK PAYMENT OVERLAY ---
+  void _showPaymentPopup(WebUri paymentUrl) {
+    HapticFeedback.heavyImpact(); 
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      enableDrag: false, // Prevents accidental swipe-down closure during transaction
+      builder: (BuildContext modalContext) {
+        final surfaceColor = isDarkMode ? const Color(0xFF1F2937) : Colors.white;
+        final textColor = isDarkMode ? Colors.white : Colors.black87;
+        
+        return Container(
+          height: MediaQuery.of(context).size.height * 0.90, // Covers bottom 90%
+          decoration: BoxDecoration(
+            color: surfaceColor,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+            boxShadow: [
+              BoxShadow(color: Colors.black.withOpacity(0.2), blurRadius: 20, offset: const Offset(0, -5))
+            ],
+          ),
+          child: Column(
+            children: [
+              // Custom Native Payment Header
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                decoration: BoxDecoration(
+                  border: Border(bottom: BorderSide(color: isDarkMode ? Colors.grey[700]! : Colors.grey[200]!)),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Row(
+                      children: [
+                        const Icon(Icons.lock_rounded, color: Colors.green, size: 22),
+                        const SizedBox(width: 8),
+                        Text("Secure Checkout", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: textColor)),
+                      ]
+                    ),
+                    IconButton(
+                      icon: Icon(Icons.close_rounded, color: isDarkMode ? Colors.grey[400] : Colors.grey[600]),
+                      onPressed: () {
+                        HapticFeedback.selectionClick();
+                        Navigator.pop(modalContext);
+                      },
+                    )
+                  ],
+                ),
+              ),
+              // Dedicated Payment WebView Frame (Free of custom styling)
+              Expanded(
+                child: ClipRRect(
+                  borderRadius: const BorderRadius.vertical(bottom: Radius.circular(24)),
+                  child: InAppWebView(
+                    initialUrlRequest: URLRequest(url: paymentUrl),
+                    initialSettings: InAppWebViewSettings(
+                      transparentBackground: true,
+                      supportZoom: false,
+                    ),
+                    onLoadStart: (controller, url) {
+                      // Automatically dismiss modal when Paystack redirects back to GEM AI
+                      if (url != null && url.host.contains('gem-ai.top')) {
+                         Navigator.pop(modalContext);
+                         webViewController?.loadUrl(urlRequest: URLRequest(url: url)); // Load success/cancel page in main app
+                      }
+                    },
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
   }
 
   void _showNativeMenu(BuildContext context) {
@@ -298,7 +374,7 @@ class _WebViewScreenState extends State<WebViewScreen> {
   }
 
   void _onItemTapped(int index) {
-    HapticFeedback.lightImpact(); // Subtle vibration on tab switch
+    HapticFeedback.lightImpact(); 
     if (index == 1) {
       _showNativeMenu(context);
       return;
@@ -322,7 +398,6 @@ class _WebViewScreenState extends State<WebViewScreen> {
       onPopInvokedWithResult: (didPop, result) async {
         if (didPop) return;
         
-        // Native Back Button & Double Tap to Exit Handling
         if (webViewController != null && await webViewController!.canGoBack()) {
           webViewController!.goBack(); 
         } else {
@@ -438,13 +513,23 @@ class _WebViewScreenState extends State<WebViewScreen> {
                   isDarkMode = themeCheck;
                 });
               },
+              
+              // URL INTERCEPTOR: Detects Paystack and forces it into the Native Modal Overlay
+              shouldOverrideUrlLoading: (controller, navigationAction) async {
+                var uri = navigationAction.request.url;
+                if (uri != null && (uri.host.contains('paystack.com') || uri.path.contains('/checkout'))) {
+                  _showPaymentPopup(uri);
+                  return NavigationActionPolicy.CANCEL; // Stops main webview from navigating
+                }
+                return NavigationActionPolicy.ALLOW;
+              },
+              
               onDownloadStartRequest: (controller, downloadRequest) async {
                 final uri = downloadRequest.url;
                 if (await canLaunchUrl(uri)) {
                   await launchUrl(uri, mode: LaunchMode.externalApplication);
                 }
               },
-              // Intercept Web Javascript Alerts and show Native Flutter Dialogs
               onJsAlert: (controller, jsAlertRequest) async {
                 HapticFeedback.mediumImpact();
                 await showDialog(
