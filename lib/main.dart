@@ -100,7 +100,6 @@ class _WebViewScreenState extends State<WebViewScreen> {
     ];
   }
 
-  // UPDATED: Script now strictly checks the domain before hiding elements!
   final String _nativeStyles = """
     var style = document.createElement('style');
     style.innerHTML = `
@@ -118,7 +117,6 @@ class _WebViewScreenState extends State<WebViewScreen> {
       }
       ::-webkit-scrollbar { display: none; }
     `;
-    // Only apply aggressive hiding if we are on the Gem AI domain
     if (window.location.hostname.includes('gem-ai.top')) {
       if(document.head) {
          document.head.appendChild(style);
@@ -143,7 +141,7 @@ class _WebViewScreenState extends State<WebViewScreen> {
       domStorageEnabled: true,
       databaseEnabled: true,
       useShouldInterceptRequest: true,
-      useShouldOverrideUrlLoading: true, // Activated URL interceptor
+      useShouldOverrideUrlLoading: true, 
       transparentBackground: true, 
       supportZoom: false, 
       builtInZoomControls: false,
@@ -204,35 +202,111 @@ class _WebViewScreenState extends State<WebViewScreen> {
     webViewController?.loadUrl(urlRequest: URLRequest(url: WebUri("https://gem-ai.top/profile")));
   }
 
-  // --- NATIVE PAYSTACK PAYMENT OVERLAY ---
+  // --- NATIVE ARKTECH ABOUT DIALOG ---
+  void _showAboutAppDialog() {
+    HapticFeedback.selectionClick();
+    final surfaceColor = isDarkMode ? const Color(0xFF1F2937) : Colors.white;
+    final textColor = isDarkMode ? Colors.white : Colors.black87;
+    
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          backgroundColor: surfaceColor,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          contentPadding: const EdgeInsets.all(24),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF007BFF),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Icon(Icons.all_inclusive_rounded, color: Colors.white, size: 32),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('Gem AI\nfor Android', style: TextStyle(color: textColor, fontWeight: FontWeight.bold, fontSize: 18, height: 1.2)),
+                        const SizedBox(height: 4),
+                        Text('1.0.0', style: TextStyle(color: isDarkMode ? Colors.grey[400] : Colors.grey[600], fontSize: 14)),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 24),
+              Text(
+                'Gem AI is a powerful media suite designed for your creative workflows. The Android version provides a seamless, secure native experience to manage your media on the go.',
+                style: TextStyle(color: textColor, fontSize: 14, height: 1.4),
+              ),
+              const SizedBox(height: 24),
+              Text('Powered and Developed by Arktech Solutions', style: TextStyle(color: textColor, fontSize: 14, fontWeight: FontWeight.w600)),
+              const SizedBox(height: 4),
+              GestureDetector(
+                onTap: () => launchUrl(Uri.parse('https://arktechsolution.top')),
+                child: const Text('https://arktechsolution.top', style: TextStyle(color: Color(0xFF007BFF), fontSize: 14)),
+              ),
+              const SizedBox(height: 24),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  TextButton(
+                    onPressed: () {
+                      Navigator.pop(context);
+                      showLicensePage(
+                        context: context,
+                        applicationName: 'Gem AI for Android',
+                        applicationVersion: '1.0.0',
+                        applicationIcon: const Icon(Icons.all_inclusive_rounded, size: 48, color: Color(0xFF007BFF)),
+                      );
+                    },
+                    child: const Text('View licenses', style: TextStyle(color: Color(0xFF007BFF), fontWeight: FontWeight.bold)),
+                  ),
+                  const SizedBox(width: 8),
+                  TextButton(
+                    onPressed: () => Navigator.pop(context),
+                    child: const Text('Close', style: TextStyle(color: Color(0xFF007BFF), fontWeight: FontWeight.bold)),
+                  ),
+                ],
+              )
+            ],
+          ),
+        );
+      }
+    );
+  }
+
   void _showPaymentPopup(WebUri paymentUrl) {
     HapticFeedback.heavyImpact(); 
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      enableDrag: false, // Prevents accidental swipe-down closure during transaction
+      enableDrag: false, 
       builder: (BuildContext modalContext) {
         final surfaceColor = isDarkMode ? const Color(0xFF1F2937) : Colors.white;
         final textColor = isDarkMode ? Colors.white : Colors.black87;
         
         return Container(
-          height: MediaQuery.of(context).size.height * 0.90, // Covers bottom 90%
+          height: MediaQuery.of(context).size.height * 0.90, 
           decoration: BoxDecoration(
             color: surfaceColor,
             borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-            boxShadow: [
-              BoxShadow(color: Colors.black.withOpacity(0.2), blurRadius: 20, offset: const Offset(0, -5))
-            ],
+            boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.2), blurRadius: 20, offset: const Offset(0, -5))],
           ),
           child: Column(
             children: [
-              // Custom Native Payment Header
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-                decoration: BoxDecoration(
-                  border: Border(bottom: BorderSide(color: isDarkMode ? Colors.grey[700]! : Colors.grey[200]!)),
-                ),
+                decoration: BoxDecoration(border: Border(bottom: BorderSide(color: isDarkMode ? Colors.grey[700]! : Colors.grey[200]!))),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
@@ -253,21 +327,16 @@ class _WebViewScreenState extends State<WebViewScreen> {
                   ],
                 ),
               ),
-              // Dedicated Payment WebView Frame (Free of custom styling)
               Expanded(
                 child: ClipRRect(
                   borderRadius: const BorderRadius.vertical(bottom: Radius.circular(24)),
                   child: InAppWebView(
                     initialUrlRequest: URLRequest(url: paymentUrl),
-                    initialSettings: InAppWebViewSettings(
-                      transparentBackground: true,
-                      supportZoom: false,
-                    ),
+                    initialSettings: InAppWebViewSettings(transparentBackground: true, supportZoom: false),
                     onLoadStart: (controller, url) {
-                      // Automatically dismiss modal when Paystack redirects back to GEM AI
                       if (url != null && url.host.contains('gem-ai.top')) {
                          Navigator.pop(modalContext);
-                         webViewController?.loadUrl(urlRequest: URLRequest(url: url)); // Load success/cancel page in main app
+                         webViewController?.loadUrl(urlRequest: URLRequest(url: url)); 
                       }
                     },
                   ),
@@ -314,10 +383,7 @@ class _WebViewScreenState extends State<WebViewScreen> {
                       _navigateToProfile();
                     },
                   ),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 24),
-                    child: Divider(color: isDarkMode ? Colors.grey[700] : Colors.grey[200]),
-                  ),
+                  Padding(padding: const EdgeInsets.symmetric(horizontal: 24), child: Divider(color: isDarkMode ? Colors.grey[700] : Colors.grey[200])),
                 ],
                 
                 _buildMenuItem(sheetContext, Icons.monetization_on_rounded, 'Pricing', "https://gem-ai.top/pricing", textColor),
@@ -325,18 +391,30 @@ class _WebViewScreenState extends State<WebViewScreen> {
                 _buildMenuItem(sheetContext, Icons.article_outlined, 'Blog', "https://gem-ai.top/blog", textColor),
                 _buildMenuItem(sheetContext, Icons.contact_mail_outlined, 'Contact Us', "https://gem-ai.top/contact", textColor),
                 
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 24),
-                  child: Divider(color: isDarkMode ? Colors.grey[700] : Colors.grey[200]),
-                ),
+                Padding(padding: const EdgeInsets.symmetric(horizontal: 24), child: Divider(color: isDarkMode ? Colors.grey[700] : Colors.grey[200])),
                 
                 ListTile(
                   contentPadding: const EdgeInsets.symmetric(horizontal: 24),
-                  leading: Icon(isDarkMode ? Icons.light_mode_rounded : Icons.dark_mode_rounded, color: isDarkMode ? Colors.yellow[400] : Colors.grey[800]),
-                  title: Text(isDarkMode ? 'Switch to Light Mode' : 'Switch to Dark Mode', style: TextStyle(color: textColor, fontWeight: FontWeight.w600)),
+                  leading: const Icon(Icons.settings_rounded, color: Colors.grey),
+                  title: Text('App Settings', style: TextStyle(color: textColor, fontWeight: FontWeight.w600)),
                   onTap: () async {
                     Navigator.pop(sheetContext);
-                    _toggleDarkMode();
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => SettingsScreen(
+                          isDarkMode: isDarkMode,
+                          onThemeToggle: _toggleDarkMode,
+                          onClearCache: () async {
+                            await webViewController?.clearCache();
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text('Web cache cleared successfully.')),
+                            );
+                          },
+                          onShowAbout: _showAboutAppDialog,
+                        ),
+                      ),
+                    );
                   },
                 ),
                 
@@ -387,6 +465,72 @@ class _WebViewScreenState extends State<WebViewScreen> {
     }
   }
 
+  // --- NATIVE SIDE DRAWER ---
+  Widget _buildDrawer() {
+    final surfaceColor = isDarkMode ? const Color(0xFF1F2937) : Colors.white;
+    final textColor = isDarkMode ? Colors.white : Colors.black87;
+
+    return Drawer(
+      backgroundColor: surfaceColor,
+      child: ListView(
+        padding: EdgeInsets.zero,
+        children: [
+          DrawerHeader(
+            decoration: const BoxDecoration(color: Color(0xFF007BFF)),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: const [
+                Icon(Icons.all_inclusive_rounded, color: Colors.white, size: 48),
+                SizedBox(height: 10),
+                Text('Gem AI', style: TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold)),
+              ],
+            ),
+          ),
+          ListTile(
+            leading: Icon(Icons.home_rounded, color: textColor),
+            title: Text('Home', style: TextStyle(color: textColor, fontWeight: FontWeight.w600)),
+            onTap: () {
+              Navigator.pop(context); // Close Drawer
+              _onItemTapped(0);
+            },
+          ),
+          ListTile(
+            leading: Icon(Icons.settings_rounded, color: textColor),
+            title: Text('Settings', style: TextStyle(color: textColor, fontWeight: FontWeight.w600)),
+            onTap: () {
+              Navigator.pop(context); // Close Drawer
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => SettingsScreen(
+                    isDarkMode: isDarkMode,
+                    onThemeToggle: _toggleDarkMode,
+                    onClearCache: () async {
+                      await webViewController?.clearCache();
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Web cache cleared successfully.')),
+                      );
+                    },
+                    onShowAbout: _showAboutAppDialog,
+                  ),
+                ),
+              );
+            },
+          ),
+          ListTile(
+            leading: Icon(Icons.info_outline_rounded, color: textColor),
+            title: Text('About', style: TextStyle(color: textColor, fontWeight: FontWeight.w600)),
+            onTap: () {
+              Navigator.pop(context); // Close Drawer
+              _showAboutAppDialog();
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final bgColor = isDarkMode ? const Color(0xFF111827) : Colors.white; 
@@ -422,30 +566,14 @@ class _WebViewScreenState extends State<WebViewScreen> {
       },
       child: Scaffold(
         backgroundColor: bgColor,
+        drawer: _buildDrawer(), // Integrated the Side Navigation Drawer
         appBar: AppBar(
           backgroundColor: surfaceColor,
           elevation: 0,
           surfaceTintColor: Colors.transparent,
-          title: Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(6),
-                decoration: BoxDecoration(
-                  color: const Color(0x1A007BFF), 
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: const Icon(Icons.all_inclusive_rounded, color: Color(0xFF007BFF), size: 24), 
-              ),
-              const SizedBox(width: 10),
-              Text('Gem AI', style: TextStyle(color: textColor, fontWeight: FontWeight.w800, fontSize: 20, letterSpacing: -0.5)),
-            ],
-          ),
+          iconTheme: IconThemeData(color: textColor), // Hamburger menu color
+          title: Text('Gem AI', style: TextStyle(color: textColor, fontWeight: FontWeight.w800, fontSize: 20, letterSpacing: -0.5)),
           actions: [
-            IconButton(
-              icon: Icon(isDarkMode ? Icons.light_mode_rounded : Icons.dark_mode_rounded, 
-                         color: isDarkMode ? Colors.yellow[400] : Colors.grey[700]),
-              onPressed: _toggleDarkMode,
-            ),
             if (isLoggedIn) ...[
               const SizedBox(width: 4),
               PopupMenuButton<String>(
@@ -513,17 +641,14 @@ class _WebViewScreenState extends State<WebViewScreen> {
                   isDarkMode = themeCheck;
                 });
               },
-              
-              // URL INTERCEPTOR: Detects Paystack and forces it into the Native Modal Overlay
               shouldOverrideUrlLoading: (controller, navigationAction) async {
                 var uri = navigationAction.request.url;
                 if (uri != null && (uri.host.contains('paystack.com') || uri.path.contains('/checkout'))) {
                   _showPaymentPopup(uri);
-                  return NavigationActionPolicy.CANCEL; // Stops main webview from navigating
+                  return NavigationActionPolicy.CANCEL; 
                 }
                 return NavigationActionPolicy.ALLOW;
               },
-              
               onDownloadStartRequest: (controller, downloadRequest) async {
                 final uri = downloadRequest.url;
                 if (await canLaunchUrl(uri)) {
@@ -634,6 +759,131 @@ class _WebViewScreenState extends State<WebViewScreen> {
             },
             child: const Text("Try Again", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
           )
+        ],
+      ),
+    );
+  }
+}
+
+// --- DEDICATED NATIVE SETTINGS SCREEN ---
+class SettingsScreen extends StatefulWidget {
+  final bool isDarkMode;
+  final VoidCallback onThemeToggle;
+  final VoidCallback onClearCache;
+  final VoidCallback onShowAbout;
+
+  const SettingsScreen({
+    super.key,
+    required this.isDarkMode,
+    required this.onThemeToggle,
+    required this.onClearCache,
+    required this.onShowAbout,
+  });
+
+  @override
+  State<SettingsScreen> createState() => _SettingsScreenState();
+}
+
+class _SettingsScreenState extends State<SettingsScreen> {
+  late bool localIsDarkMode;
+  bool pushNotificationsEnabled = true;
+
+  @override
+  void initState() {
+    super.initState();
+    localIsDarkMode = widget.isDarkMode;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final bgColor = localIsDarkMode ? const Color(0xFF111827) : const Color(0xFFF3F4F6);
+    final surfaceColor = localIsDarkMode ? const Color(0xFF1F2937) : Colors.white;
+    final textColor = localIsDarkMode ? Colors.white : Colors.black87;
+    final subTextColor = localIsDarkMode ? Colors.grey[400] : Colors.grey[600];
+
+    return Scaffold(
+      backgroundColor: bgColor,
+      appBar: AppBar(
+        backgroundColor: surfaceColor,
+        elevation: 0,
+        surfaceTintColor: Colors.transparent,
+        iconTheme: IconThemeData(color: textColor),
+        title: Text('Settings', style: TextStyle(color: textColor, fontWeight: FontWeight.bold)),
+      ),
+      body: ListView(
+        children: [
+          const SizedBox(height: 10),
+          
+          // PREFERENCES SECTION
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            child: Text('Preferences', style: TextStyle(color: const Color(0xFF007BFF), fontWeight: FontWeight.bold, fontSize: 13)),
+          ),
+          Container(
+            color: surfaceColor,
+            child: Column(
+              children: [
+                SwitchListTile(
+                  activeColor: const Color(0xFF007BFF),
+                  title: Text('Dark Mode', style: TextStyle(color: textColor, fontWeight: FontWeight.w600)),
+                  subtitle: Text('Switch between crisp light and dark themes.', style: TextStyle(color: subTextColor, fontSize: 13)),
+                  value: localIsDarkMode,
+                  onChanged: (value) {
+                    setState(() => localIsDarkMode = value);
+                    widget.onThemeToggle(); // Syncs with web view seamlessly
+                  },
+                ),
+                Divider(height: 1, color: localIsDarkMode ? Colors.grey[800] : Colors.grey[200]),
+                SwitchListTile(
+                  activeColor: const Color(0xFF007BFF),
+                  title: Text('Push Notifications', style: TextStyle(color: textColor, fontWeight: FontWeight.w600)),
+                  subtitle: Text('Receive alerts for new features and updates.', style: TextStyle(color: subTextColor, fontSize: 13)),
+                  value: pushNotificationsEnabled,
+                  onChanged: (value) {
+                    HapticFeedback.lightImpact();
+                    setState(() => pushNotificationsEnabled = value);
+                  },
+                ),
+              ],
+            ),
+          ),
+          
+          const SizedBox(height: 20),
+          
+          // STORAGE SECTION
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            child: Text('Storage & Data', style: TextStyle(color: const Color(0xFF007BFF), fontWeight: FontWeight.bold, fontSize: 13)),
+          ),
+          Container(
+            color: surfaceColor,
+            child: ListTile(
+              title: Text('Clear Web Cache', style: TextStyle(color: textColor, fontWeight: FontWeight.w600)),
+              subtitle: Text('Free up space by clearing cached web data.', style: TextStyle(color: subTextColor, fontSize: 13)),
+              trailing: Icon(Icons.delete_outline_rounded, color: subTextColor),
+              onTap: () {
+                HapticFeedback.lightImpact();
+                widget.onClearCache();
+              },
+            ),
+          ),
+          
+          const SizedBox(height: 20),
+          
+          // ABOUT SECTION
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            child: Text('About', style: TextStyle(color: const Color(0xFF007BFF), fontWeight: FontWeight.bold, fontSize: 13)),
+          ),
+          Container(
+            color: surfaceColor,
+            child: ListTile(
+              title: Text('About Gem AI', style: TextStyle(color: textColor, fontWeight: FontWeight.w600)),
+              subtitle: Text('Version 2.1.0\nDeveloped by Arktech Solutions', style: TextStyle(color: subTextColor, fontSize: 13, height: 1.4)),
+              isThreeLine: true,
+              onTap: widget.onShowAbout,
+            ),
+          ),
         ],
       ),
     );
